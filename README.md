@@ -13,6 +13,7 @@ Built by **Wazeer Mohideen**.
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Authentication Methods](#authentication-methods)
+- [Recording a Test Case](#recording-a-test-case)
 - [Writing Your First Test](#writing-your-first-test)
 - [Adding Faker Data to Your Test](#adding-faker-data-to-your-test)
 - [Test Conditions — Happy Path & Edge Cases](#test-conditions--happy-path--edge-cases)
@@ -212,6 +213,98 @@ All methods save to the same location:
 rm -rf .playwright-ms-auth/
 npm run auth
 npm run auth:mda
+```
+
+---
+
+## Recording a Test Case
+
+The fastest way to write a test is to record it — Playwright opens a browser with your saved session and captures every click, fill, and navigation as TypeScript code in real time.
+
+### Step 1 — Make sure your MDA session is valid
+
+Sessions expire after 24 hours. Re-authenticate if needed:
+
+```bash
+npm run auth:mda
+```
+
+### Step 2 — Launch the recorder
+
+```bash
+npx playwright codegen \
+  --browser=chromium \
+  --load-storage=".playwright-ms-auth/state-mda-you@yourorg.com.json" \
+  "YOUR_MODEL_DRIVEN_APP_URL"
+```
+
+Replace `you@yourorg.com` with your `MS_AUTH_EMAIL` and `YOUR_MODEL_DRIVEN_APP_URL` with the value from your `.env` file.
+
+Two windows open:
+- **Browser** — your MDA, already signed in
+- **Playwright Inspector** — generated TypeScript code appears here as you interact
+
+### Step 3 — Perform your workflow
+
+Click through your workflow normally in the browser. Every action is captured:
+- Clicking buttons and menu items
+- Filling text fields
+- Selecting dropdown options
+- Navigating between pages
+
+### Step 4 — Copy the generated code
+
+When done, copy all the code from the **Playwright Inspector** panel on the right.
+
+### Step 5 — Refactor into a proper test
+
+The raw codegen output works but needs a few changes before it's production-ready. Here's what to update:
+
+| Codegen output | What to change |
+|---|---|
+| Hardcoded strings (`"Test Equipment 123"`) | Replace with `record.name`, `record.uniqueId`, etc. from the `record` fixture |
+| `page.goto('...')` | Add `{ waitUntil: 'domcontentloaded' }` — MDA pages are slow |
+| Raw `test(...)` | Wrap in `test.describe.serial(...)` if steps depend on each other |
+| No save confirmation | Add `await waitForSave(page, ENTITY_NAME)` after saving |
+| No duplicate handling | Add `await dismissDuplicateDialog(page)` after the save click |
+
+**Before (raw codegen):**
+```typescript
+import { test, expect } from '@playwright/test';
+
+test('test', async ({ page }) => {
+  await page.goto('https://yourorg.crm.dynamics.com/main.aspx?...');
+  await page.getByRole('menuitem', { name: 'New' }).click();
+  await page.getByRole('textbox', { name: 'Name' }).fill('Test Equipment 001');
+  await page.getByRole('menuitem', { name: 'Save (CTRL+S)' }).click();
+});
+```
+
+**After (production-ready):**
+```typescript
+import { expect } from '@playwright/test';
+import { test } from '../fixtures/mda.fixtures';
+import { waitForSave, dismissDuplicateDialog } from '../helpers/mda';
+
+const MODEL_DRIVEN_APP_URL = process.env.MODEL_DRIVEN_APP_URL!;
+const ENTITY_NAME = 'your_entity_name';
+
+test.describe.serial('My Workflow', () => {
+  test.setTimeout(180_000);
+
+  test('create record', async ({ page, record }) => {
+    await page.goto(MODEL_DRIVEN_APP_URL, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[role="menuitem"]', { timeout: 30_000 });
+
+    await page.getByRole('menuitem', { name: 'New' }).click();
+    await page.getByRole('textbox', { name: 'Name' }).fill(record.name); // ← Faker data
+    await page.getByRole('menuitem', { name: 'Save (CTRL+S)' }).click();
+    await dismissDuplicateDialog(page);
+    await waitForSave(page, ENTITY_NAME);
+
+    await expect(page.getByRole('heading', { name: record.name })).toBeVisible();
+  });
+});
 ```
 
 ---
