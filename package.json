@@ -19,17 +19,24 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "report:allure": "allure generate allure-results --clean -o allure-report && allure open allure-report"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
     "@faker-js/faker": "^9.0.0",
     "@playwright/test": "^1.57.0",
     "@types/node": "^20.0.0",
+    "allure-commandline": "^2.30.0",
+    "allure-playwright": "^3.0.0",
     "dotenv": "^16.4.7",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0"
   },
   "dependencies": {
-    "playwright-ms-auth": "^0.0.17"
+    "@azure/identity": "^4.0.0",
+    "@microsoft/microsoft-graph-client": "^3.0.0",
+    "playwright-ms-auth": "^0.0.17",
+    "zod": "^3.23.0"
   }
 }
