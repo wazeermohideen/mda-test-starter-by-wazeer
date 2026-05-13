@@ -12,7 +12,7 @@ Built by **Wazeer Mohideen**.
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
-- [Authentication](#authentication)
+- [Authentication Methods](#authentication-methods)
 - [Writing Your First Test](#writing-your-first-test)
 - [Adding Faker Data to Your Test](#adding-faker-data-to-your-test)
 - [Test Conditions — Happy Path & Edge Cases](#test-conditions--happy-path--edge-cases)
@@ -108,27 +108,97 @@ FAKER_DOMAIN=generic
 
 ---
 
-## Authentication
+## Authentication Methods
 
 Authentication runs once and saves your browser session to disk. Tests reuse that session so they never have to sign in again. Sessions last **24 hours**.
 
-**Step 1 — Authenticate to Power Apps (base session)**
+Four methods are supported — pick the one that fits your setup.
+
+---
+
+### Method 1 — Password (local development)
+
+The simplest option. Add your email and password to `.env` and run:
+
+```bash
+npm run auth      # Power Apps base session
+npm run auth:mda  # Dynamics 365 / MDA session
+```
+
+A browser window opens, you sign in, approve MFA, and the session is saved. The script waits up to 2 minutes for MFA.
+
+```ini
+MS_AUTH_CREDENTIAL_TYPE=password
+MS_AUTH_CREDENTIAL_PROVIDER=environment
+MS_USER_PASSWORD=your-password
+```
+
+---
+
+### Method 2 — Certificate via local .pfx file (CI/CD, shared teams)
+
+Best when you can't share a password — uses a certificate registered in Azure Active Directory instead. No browser prompt, no MFA.
+
+**Prerequisites:**
+1. Register an app in [Azure Active Directory](https://portal.azure.com) → App registrations
+2. Generate a `.pfx` certificate and upload the public key to the app registration
+3. Grant the app access to your Power Platform environment
+
+```ini
+MS_AUTH_CREDENTIAL_TYPE=certificate
+MS_AUTH_CREDENTIAL_PROVIDER=local-file
+MS_AUTH_LOCAL_FILE_PATH=./certs/your-cert.pfx
+MS_AUTH_CERTIFICATE_PASSWORD=           # leave blank if the cert has no password
+```
 
 ```bash
 npm run auth
-```
-
-A browser window opens. Sign in with your Microsoft account and approve MFA when prompted. The script waits up to 2 minutes for MFA to complete.
-
-**Step 2 — Authenticate to the Model-Driven App (Dynamics 365 domain)**
-
-```bash
 npm run auth:mda
 ```
 
-This creates a second session for the `*.crm.dynamics.com` domain your MDA runs on.
+> Keep your `.pfx` file out of source control — add `certs/` to `.gitignore`.
 
-**Where sessions are stored**
+---
+
+### Method 3 — Certificate via Azure Key Vault (enterprise CI/CD)
+
+Best for Azure DevOps pipelines or any team that centralizes secrets in Key Vault. The certificate never touches the file system.
+
+```ini
+MS_AUTH_CREDENTIAL_TYPE=certificate
+MS_AUTH_CREDENTIAL_PROVIDER=azure-keyvault
+AZURE_KEYVAULT_URI=https://your-vault.vault.azure.net
+AZURE_KEYVAULT_SECRET_NAME=your-cert-secret-name
+AZURE_TENANT_ID=your-tenant-id
+AZURE_CLIENT_ID=your-client-id
+AZURE_CLIENT_SECRET=your-client-secret
+```
+
+The pipeline service principal needs `Key Vault Secrets User` access on the vault.
+
+---
+
+### Method 4 — Certificate via GitHub Secrets (GitHub Actions)
+
+Best for open-source or GitHub-hosted CI. Store the base64-encoded certificate as a GitHub secret and reference it by name.
+
+```ini
+MS_AUTH_CREDENTIAL_TYPE=certificate
+MS_AUTH_CREDENTIAL_PROVIDER=github-secrets
+GITHUB_CERT_SECRET_NAME=PLAYWRIGHT_CERT
+```
+
+To encode your cert for GitHub:
+```bash
+base64 -i your-cert.pfx | pbcopy   # macOS — copies to clipboard
+# Paste as the value of the PLAYWRIGHT_CERT secret in GitHub → Settings → Secrets
+```
+
+---
+
+### Where sessions are stored
+
+All methods save to the same location:
 
 ```
 .playwright-ms-auth/
@@ -136,7 +206,7 @@ This creates a second session for the `*.crm.dynamics.com` domain your MDA runs 
   state-mda-you@yourorg.com.json      ← Dynamics 365 / MDA session
 ```
 
-**Re-authenticating after 24 hours**
+### Re-authenticating after 24 hours
 
 ```bash
 rm -rf .playwright-ms-auth/
@@ -555,6 +625,10 @@ npx playwright test --project=mda
 | Browser opens but MFA prompt disappears too fast | Script waits 2 minutes — approve MFA before the window closes |
 | `MODEL_DRIVEN_APP_URL is required` | Make sure you copied `.env.example` to `.env` and filled in the URL |
 | MDA shows "An error has occurred" during auth | Your `MODEL_DRIVEN_APP_URL` app ID is wrong, or your account doesn't have access |
+| `Certificate validation failed` | Your `.pfx` file is invalid, the wrong password was set, or the cert isn't registered in Azure AD |
+| `Key Vault secret not found` | Check `AZURE_KEYVAULT_SECRET_NAME` and that the service principal has `Key Vault Secrets User` role |
+| Certificate auth works locally but fails in CI | The cert may have expired, or the CI service principal doesn't have Power Platform access |
+| GitHub Actions cert not loading | Make sure the secret is base64-encoded (not the raw binary) and the secret name matches `GITHUB_CERT_SECRET_NAME` |
 
 ### Test failures
 
