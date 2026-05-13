@@ -1,0 +1,7 @@
+node_modules/
+.env
+.playwright-ms-auth/
+/test-results/
+/playwright-report/
+/blob-report/
+/data/generated/*.json

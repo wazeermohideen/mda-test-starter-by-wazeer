@@ -1,0 +1,35 @@
+{
+  "name": "mda-test-starter-by-wazeer",
+  "version": "1.0.0",
+  "description": "Playwright starter kit for Microsoft Power Platform Model-Driven Apps with domain-aware Faker.js test data",
+  "keywords": [
+    "playwright",
+    "power-platform",
+    "dynamics-365",
+    "model-driven-app",
+    "faker",
+    "e2e-testing"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "auth": "tsx auth/authenticate.ts --headful",
+    "auth:mda": "tsx auth/authenticate.ts --headful --mda",
+    "seed": "tsx data/seed.ts",
+    "install:browsers": "playwright install chromium",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^9.0.0",
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^20.0.0",
+    "dotenv": "^16.4.7",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "playwright-ms-auth": "^0.0.17"
+  }
+}
