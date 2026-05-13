@@ -17,8 +17,16 @@ export default defineConfig({
   timeout: 180_000,
 
   reporter: process.env.CI
-    ? [['dot'], ['junit', { outputFile: 'test-results/junit.xml' }]]
-    : [['list'], ['html', { open: 'never' }]],
+    ? [
+        ['dot'],
+        ['junit', { outputFile: 'test-results/junit.xml' }],
+        ['allure-playwright', { outputFolder: 'allure-results' }],
+      ]
+    : [
+        ['list'],
+        ['html', { open: 'never' }],
+        ['allure-playwright', { outputFolder: 'allure-results' }],
+      ],
 
   use: {
     browserName: 'chromium',
