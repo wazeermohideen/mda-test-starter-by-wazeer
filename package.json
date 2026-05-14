@@ -13,7 +13,9 @@
   "license": "MIT",
   "scripts": {
     "auth": "tsx auth/authenticate.ts --headful",
+    "auth:headful": "tsx auth/authenticate.ts --headful",
     "auth:mda": "tsx auth/authenticate.ts --headful --mda",
+    "auth:mda:headful": "tsx auth/authenticate.ts --headful --mda",
     "seed": "tsx data/seed.ts",
     "install:browsers": "playwright install chromium",
     "test": "playwright test",
