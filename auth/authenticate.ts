@@ -3,101 +3,92 @@
  * Microsoft Authentication Script
  *
  * Usage:
- *   npm run auth        # Authenticate to Power Apps (base session)
- *   npm run auth:mda    # Authenticate to Model-Driven App (Dynamics 365 domain)
+ *   npm run auth:headful      # Authenticate to Power Apps
+ *   npm run auth:mda:headful  # Authenticate to Model-Driven App (Dynamics CRM domain)
  *
- * Both commands open a browser window. Sign in and approve MFA when prompted.
+ * A browser window opens. Sign in with your Microsoft account using whatever
+ * method your org uses (SSO, MFA app, Windows Hello, etc.).
  * Sessions are saved to .playwright-ms-auth/ and last 24 hours.
  */
 
 import { chromium } from '@playwright/test';
-import { authenticate, loadConfigFromEnv, getStorageStatePath } from 'playwright-ms-auth';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-const isHeadful = process.argv.includes('--headful');
-const isMda     = process.argv.includes('--mda');
+const isMda = process.argv.includes('--mda');
 
-async function authenticatePowerApps() {
-  console.log('\n🔐 Authenticating to Power Apps...\n');
+const STATE_DIR = path.resolve('.playwright-ms-auth');
 
-  const config = loadConfigFromEnv() as any;
-  config.headless = !isHeadful;
-
-  const targetUrl = process.env.POWER_APPS_BASE_URL ?? 'https://make.powerapps.com';
-  await authenticate(config, targetUrl);
-
-  const statePath = getStorageStatePath(config.email);
-  console.log(`\n✅ Saved session to: ${statePath}`);
+function stateFilePath(tag: string): string {
+  const email = process.env.MS_AUTH_EMAIL ?? 'user';
+  return path.join(STATE_DIR, `state-${tag}-${email}.json`);
 }
 
-async function authenticateModelDriven() {
-  console.log('\n🔐 Authenticating to Model-Driven App (Dynamics 365 domain)...\n');
+function ensureStateDir() {
+  if (!fs.existsSync(STATE_DIR)) fs.mkdirSync(STATE_DIR, { recursive: true });
+}
 
-  const email = process.env.MS_AUTH_EMAIL;
-  const mdaUrl = process.env.MODEL_DRIVEN_APP_URL;
+async function signInInteractive(targetUrl: string, statePath: string, label: string) {
+  console.log(`\n🔐 Authenticating — ${label}\n`);
+  console.log(`  Opening: ${targetUrl}`);
+  console.log('  Sign in with your Microsoft account in the browser window.');
+  console.log('  The script saves your session automatically once you are logged in.\n');
 
-  if (!email) throw new Error('MS_AUTH_EMAIL is required in .env');
-  if (!mdaUrl) throw new Error('MODEL_DRIVEN_APP_URL is required in .env');
-
-  // Derive paths
-  const baseStatePath = getStorageStatePath(email);
-  const stateDir      = path.dirname(baseStatePath);
-  const mdaStatePath  = path.join(stateDir, `state-mda-${email}.json`);
-
-  console.log(`  Email : ${email}`);
-  console.log(`  URL   : ${mdaUrl}`);
-  console.log(`  State : ${mdaStatePath}\n`);
-
-  // Run base auth first if no session exists yet
-  if (!fs.existsSync(baseStatePath)) {
-    console.log('⚠️  No base session found — running base auth first...\n');
-    await authenticatePowerApps();
-  }
-
-  // Launch Chromium with the existing base session
-  const browser = await chromium.launch({ headless: !isHeadful });
+  const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
-    storageState: baseStatePath,
+    viewport: { width: 1440, height: 900 },
     ignoreHTTPSErrors: true,
-    viewport: { width: 1920, height: 1080 },
   });
-
   const page = await context.newPage();
 
-  try {
-    await page.goto(mdaUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-    await page.waitForTimeout(5_000);
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
-    const hasError = (await page.locator('text=An error has occurred').count()) > 0;
-    if (hasError) {
-      await page.screenshot({ path: 'mda-auth-error.png', fullPage: true });
-      throw new Error('MDA returned an error page. Check your MODEL_DRIVEN_APP_URL and user permissions. Screenshot saved to mda-auth-error.png.');
-    }
+  // Wait until sign-in completes — URL leaves the Microsoft login domain
+  console.log('  Waiting for sign-in to complete (up to 3 minutes)...\n');
+  await page.waitForURL(
+    url => !url.includes('login.microsoftonline.com') && !url.includes('login.microsoft.com'),
+    { timeout: 180_000 }
+  );
 
-    await context.storageState({ path: mdaStatePath });
-    console.log(`✅ MDA session saved to: ${mdaStatePath}`);
-  } finally {
-    await browser.close();
-  }
+  // Give the page a moment to settle and set cookies
+  await page.waitForTimeout(3_000);
+
+  ensureStateDir();
+  await context.storageState({ path: statePath });
+  await browser.close();
+
+  console.log(`✅ Session saved to: ${statePath}`);
+  console.log('   Re-run this command every 24 hours or when you see auth errors.\n');
 }
 
 (async () => {
+  const email = process.env.MS_AUTH_EMAIL;
+  const mdaUrl = process.env.MODEL_DRIVEN_APP_URL;
+
+  if (!email) {
+    console.error('❌ MS_AUTH_EMAIL is required in .env');
+    process.exit(1);
+  }
+
   try {
     if (isMda) {
-      await authenticateModelDriven();
+      if (!mdaUrl) {
+        console.error('❌ MODEL_DRIVEN_APP_URL is required in .env for --mda auth');
+        process.exit(1);
+      }
+      const statePath = stateFilePath('mda');
+      await signInInteractive(mdaUrl, statePath, 'Model-Driven App (Dynamics 365)');
     } else {
-      await authenticatePowerApps();
+      const baseUrl = process.env.POWER_APPS_BASE_URL ?? 'https://make.powerapps.com';
+      const statePath = stateFilePath('powerapps');
+      await signInInteractive(baseUrl, statePath, 'Power Apps');
     }
     process.exit(0);
   } catch (err: any) {
     console.error('\n❌', err.message);
-    console.log('\nRequired .env variables:');
-    console.log('  MS_AUTH_EMAIL, MS_USER_PASSWORD (or certificate config)');
-    console.log('  MODEL_DRIVEN_APP_URL (for --mda flag)');
     process.exit(1);
   }
 })();
