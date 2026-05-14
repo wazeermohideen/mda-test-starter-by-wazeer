@@ -49,7 +49,7 @@ async function signInInteractive(targetUrl: string, statePath: string, label: st
   // Wait until sign-in completes — URL leaves the Microsoft login domain
   console.log('  Waiting for sign-in to complete (up to 3 minutes)...\n');
   await page.waitForURL(
-    url => !url.includes('login.microsoftonline.com') && !url.includes('login.microsoft.com'),
+    url => !url.href.includes('login.microsoftonline.com') && !url.href.includes('login.microsoft.com'),
     { timeout: 180_000 }
   );
 
