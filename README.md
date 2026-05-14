@@ -710,6 +710,58 @@ npx playwright test --project=mda
 
 ## Troubleshooting & Things to Know
 
+### Installation
+
+| Problem | Fix |
+|---|---|
+| `SELF_SIGNED_CERT_IN_CHAIN` when running `npm install` or `npm run install:browsers` | Corporate network SSL inspection — see fix below |
+| `npm install` hangs or times out | Try `npm install --prefer-offline` or connect outside the VPN |
+| `npx playwright install` fails with a certificate error | Same root cause — use the `NODE_EXTRA_CA_CERTS` fix below |
+
+**`SELF_SIGNED_CERT_IN_CHAIN` — Corporate Network Fix**
+
+Your company's network proxy intercepts HTTPS traffic and presents a self-signed certificate. Node.js rejects it because the root isn't in its built-in trust store.
+
+**Step 1 — Export your corporate root certificate**
+
+On Windows, run in PowerShell:
+```powershell
+# List trusted roots and find your company's CA
+Get-ChildItem Cert:\LocalMachine\Root | Where-Object { $_.Subject -like "*YourCompany*" }
+
+# Export it (replace THUMBPRINT with the value shown above)
+$cert = Get-ChildItem Cert:\LocalMachine\Root\THUMBPRINT
+$pem  = [Convert]::ToBase64String($cert.Export('Cert'), [System.Base64FormattingOptions]::InsertLineBreaks)
+"-----BEGIN CERTIFICATE-----`n$pem`n-----END CERTIFICATE-----" | Out-File -FilePath C:\corp-root-ca.pem
+```
+
+If you're unsure which cert to export, ask IT — they can hand you `corp-root-ca.pem` directly.
+
+**Step 2 — Point Node.js at it**
+
+```powershell
+# Set for the current PowerShell session
+$env:NODE_EXTRA_CA_CERTS = "C:\corp-root-ca.pem"
+npm install
+npm run install:browsers
+```
+
+To make it permanent (survives reboots):
+```powershell
+[System.Environment]::SetEnvironmentVariable("NODE_EXTRA_CA_CERTS", "C:\corp-root-ca.pem", "User")
+```
+
+**Quick workaround (unblock yourself now — not for permanent use)**
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
+npm install
+npm run install:browsers
+# Remove this variable after the install — do not leave it set
+```
+
+---
+
 ### Authentication
 
 | Problem | Fix |
