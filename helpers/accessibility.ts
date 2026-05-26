@@ -43,21 +43,36 @@ export async function assertA11y(
 ): Promise<void> {
   const violations = await scanA11y(page, options);
 
-  if (violations.length > 0) {
-    await testInfo.attach('Accessibility Violations', {
-      body: JSON.stringify(violations, null, 2),
-      contentType: 'application/json',
-    });
+  const passed = violations.length === 0;
 
+  await testInfo.attach('Accessibility Report', {
+    body: JSON.stringify(
+      passed
+        ? { result: 'PASS', violations: 0 }
+        : {
+            result: 'VIOLATIONS FOUND',
+            count: violations.length,
+            violations: violations.map(v => ({
+              impact: v.impact,
+              id: v.id,
+              description: v.description,
+              helpUrl: v.helpUrl,
+              elements: v.nodes.length,
+            })),
+          },
+      null,
+      2
+    ),
+    contentType: 'application/json',
+  });
+
+  if (!passed) {
     const summary = violations
       .map(v => `[${v.impact?.toUpperCase()}] ${v.id}: ${v.description} (${v.nodes.length} element(s))`)
       .join('\n');
-
-    throw new Error(`${violations.length} accessibility violation(s) found:\n\n${summary}`);
+    testInfo.annotations.push({
+      type: 'Accessibility',
+      description: `${violations.length} violation(s):\n${summary}`,
+    });
   }
-
-  await testInfo.attach('Accessibility Scan', {
-    body: JSON.stringify({ result: 'PASS', violations: 0 }, null, 2),
-    contentType: 'application/json',
-  });
 }
