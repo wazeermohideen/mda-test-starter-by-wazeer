@@ -54,7 +54,7 @@ This starter kit gives you everything you need to write automated end-to-end tes
 **Step 1 — Clone the repository**
 
 ```bash
-git clone https://github.com/your-username/mda-test-starter-by-wazeer.git
+git clone [https://github.com/your-username/mda-test-starter-by-wazeer.git](https://github.com/wazeermohideen/mda-test-starter-by-wazeer.git)
 cd mda-test-starter-by-wazeer
 ```
 
