@@ -98,12 +98,13 @@ export class DataverseClient {
   /** Query records with OData filter/select/top. */
   async query(
     entityPluralName: string,
-    options: { filter?: string; select?: string[]; top?: number } = {}
+    options: { filter?: string; select?: string[]; top?: number; orderBy?: string[] } = {}
   ): Promise<Record<string, unknown>[]> {
     const params = new URLSearchParams();
     if (options.filter) params.set('$filter', options.filter);
     if (options.select?.length) params.set('$select', options.select.join(','));
     if (options.top) params.set('$top', String(options.top));
+    if (options.orderBy?.length) params.set('$orderby', options.orderBy.join(','));
 
     const qs = params.toString() ? `?${params}` : '';
     const result = await this.fetch<{ value: Record<string, unknown>[] }>('GET', `${entityPluralName}${qs}`);

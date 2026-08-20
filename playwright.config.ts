@@ -1,12 +1,7 @@
-import * as path from 'path';
 import { defineConfig } from '@playwright/test';
 import dotenv from 'dotenv';
 
 dotenv.config();
-
-const MDA_STATE = process.env.MS_AUTH_EMAIL
-  ? path.join('.playwright-ms-auth', `state-mda-${process.env.MS_AUTH_EMAIL}.json`)
-  : undefined;
 
 export default defineConfig({
   testDir: './tests',
@@ -19,6 +14,7 @@ export default defineConfig({
   reporter: process.env.CI
     ? [
         ['dot'],
+        ['html', { open: 'never' }],
         ['junit', { outputFile: 'test-results/junit.xml' }],
         ['allure-playwright', { outputFolder: 'allure-results' }],
       ]
@@ -43,10 +39,10 @@ export default defineConfig({
 
   projects: [
     {
+      // storageState is not set here — the `storageState` fixture in
+      // fixtures/mda.fixtures.ts resolves it per-test from `userAlias`,
+      // so each test/describe block can run as a different QA user.
       name: 'mda',
-      use: {
-        storageState: MDA_STATE,
-      },
     },
   ],
 

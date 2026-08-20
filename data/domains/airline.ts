@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { DomainProfile } from '../factory';
+import { TEST_USERS, pickRandom } from '../static';
 
 /**
  * Airline domain — uses faker.airline for flights, airports, seat classes, and record locators.
@@ -27,6 +28,6 @@ export const airlineProfile: DomainProfile = {
     return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
   },
   status:      () => faker.helpers.arrayElement(['Scheduled', 'Boarding', 'Departed', 'Landed', 'Cancelled', 'Delayed']),
-  owner:       () => faker.person.fullName(),
+  owner:       () => pickRandom(TEST_USERS),
   notes:       () => `Seat ${faker.airline.seat()} — ${faker.airline.aircraftType()} aircraft`,
 };

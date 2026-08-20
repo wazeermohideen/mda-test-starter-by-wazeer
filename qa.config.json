@@ -1,0 +1,21 @@
+{
+  "entity": {
+    "logicalName": "your_entity_logical_name"
+  },
+  "users": [
+    {
+      "alias": "test-user-1",
+      "name": "Test User 1",
+      "email": "test.user.1@yourorg.com",
+      "description": "Default business user for happy-path flows"
+    },
+    {
+      "alias": "manager",
+      "name": "Manager User",
+      "email": "manager.user@yourorg.com",
+      "description": "Use for approval and elevated-permission flows"
+    }
+  ],
+  "domain": "generic",
+  "suppressedViolations": []
+}

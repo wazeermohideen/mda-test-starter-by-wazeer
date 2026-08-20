@@ -15,16 +15,28 @@ import { chromium } from '@playwright/test';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
+import { buildStorageStatePath } from '../helpers/test-users';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const isMda = process.argv.includes('--mda');
+const userArgIndex = process.argv.findIndex(arg => arg === '--user');
+const userAlias = userArgIndex >= 0 ? process.argv[userArgIndex + 1] : undefined;
 
 const STATE_DIR = path.resolve('.playwright-ms-auth');
 
-function stateFilePath(tag: string): string {
-  const email = process.env.MS_AUTH_EMAIL ?? 'user';
-  return path.join(STATE_DIR, `state-${tag}-${email}.json`);
+async function resolveSelectedUser() {
+  if (!userAlias) {
+    return undefined;
+  }
+
+  const { findQaUser } = await import('../data/qa-config');
+  const matchedUser = findQaUser(userAlias);
+  if (!matchedUser) {
+    throw new Error(`Unknown QA user "${userAlias}". Check qa.config.json.`);
+  }
+
+  return matchedUser;
 }
 
 function ensureStateDir() {
@@ -65,11 +77,12 @@ async function signInInteractive(targetUrl: string, statePath: string, label: st
 }
 
 (async () => {
-  const email = process.env.MS_AUTH_EMAIL;
+  const selectedUser = await resolveSelectedUser();
+  const email = selectedUser?.email ?? process.env.MS_AUTH_EMAIL;
   const mdaUrl = process.env.MODEL_DRIVEN_APP_URL;
 
   if (!email) {
-    console.error('❌ MS_AUTH_EMAIL is required in .env');
+    console.error('❌ MS_AUTH_EMAIL is required in .env, or provide --user with an email-backed entry from qa.config.json');
     process.exit(1);
   }
 
@@ -79,12 +92,16 @@ async function signInInteractive(targetUrl: string, statePath: string, label: st
         console.error('❌ MODEL_DRIVEN_APP_URL is required in .env for --mda auth');
         process.exit(1);
       }
-      const statePath = stateFilePath('mda');
-      await signInInteractive(mdaUrl, statePath, 'Model-Driven App (Dynamics 365)');
+      const statePath = buildStorageStatePath('mda', email);
+      const label = selectedUser
+        ? `Model-Driven App (Dynamics 365) [${selectedUser.alias}]`
+        : 'Model-Driven App (Dynamics 365)';
+      await signInInteractive(mdaUrl, statePath, label);
     } else {
       const baseUrl = process.env.POWER_APPS_BASE_URL ?? 'https://make.powerapps.com';
-      const statePath = stateFilePath('powerapps');
-      await signInInteractive(baseUrl, statePath, 'Power Apps');
+      const statePath = buildStorageStatePath('powerapps', email);
+      const label = selectedUser ? `Power Apps [${selectedUser.alias}]` : 'Power Apps';
+      await signInInteractive(baseUrl, statePath, label);
     }
     process.exit(0);
   } catch (err: any) {

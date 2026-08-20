@@ -22,7 +22,9 @@
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
-    "report:allure": "allure generate allure-results --clean -o allure-report && allure open allure-report"
+    "report:allure": "allure generate allure-results --clean -o allure-report && allure open allure-report",
+    "report:a11y:check": "tsx scripts/report-a11y.ts --check",
+    "report:a11y": "tsx scripts/report-a11y.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",

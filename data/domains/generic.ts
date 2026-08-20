@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { DomainProfile } from '../factory';
+import { TEST_USERS, pickRandom } from '../static';
 
 export const genericProfile: DomainProfile = {
   name:        () => faker.commerce.productName(),
@@ -12,6 +13,6 @@ export const genericProfile: DomainProfile = {
     return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
   },
   status:      () => faker.helpers.arrayElement(['Active', 'Pending', 'Closed', 'In Progress']),
-  owner:       () => faker.person.fullName(),
+  owner:       () => pickRandom(TEST_USERS),
   notes:       () => faker.lorem.sentences(2),
 };

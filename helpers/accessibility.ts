@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -74,5 +75,26 @@ export async function assertA11y(
       type: 'Accessibility',
       description: `${violations.length} violation(s):\n${summary}`,
     });
+
+    // Write a machine-readable violations file so the pipeline can create ADO work items.
+    // File lives in the per-test output folder — one file per test, no concurrency issues.
+    fs.writeFileSync(
+      testInfo.outputPath('a11y-violations.json'),
+      JSON.stringify(
+        {
+          test: testInfo.title,
+          file: testInfo.file,
+          violations: violations.map(v => ({
+            impact: v.impact,
+            id: v.id,
+            description: v.description,
+            helpUrl: v.helpUrl,
+            nodes: v.nodes.length,
+          })),
+        },
+        null,
+        2
+      )
+    );
   }
 }

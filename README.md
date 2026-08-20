@@ -89,7 +89,8 @@ cp .env.example .env
 # How to find it: open your MDA in the browser and copy the entire URL including ?appid=
 MODEL_DRIVEN_APP_URL=https://your-org.crm.dynamics.com/main.aspx?appid=00000000-0000-0000-0000-000000000000
 
-# Your Microsoft account
+# Default Microsoft account
+# Optional if you authenticate by friendly alias from qa.config.json
 MS_AUTH_EMAIL=you@yourorg.com
 MS_AUTH_CREDENTIAL_TYPE=password
 MS_AUTH_CREDENTIAL_PROVIDER=environment
@@ -106,6 +107,31 @@ FAKER_DOMAIN=generic
 ```
 
 > **Never commit `.env`** — it contains your credentials. It is already in `.gitignore`.
+
+**Step 3 — Define friendly test users in `qa.config.json`**
+
+```json
+{
+  "entity": {
+    "logicalName": "your_entity_logical_name"
+  },
+  "users": [
+    {
+      "alias": "test-user-1",
+      "name": "Test User 1",
+      "email": "test.user.1@yourorg.com"
+    },
+    {
+      "alias": "manager",
+      "name": "Manager User",
+      "email": "manager.user@yourorg.com"
+    }
+  ],
+  "domain": "generic"
+}
+```
+
+Use `alias` in tests. The raw email stays in config instead of leaking into test code.
 
 ---
 
@@ -124,6 +150,12 @@ The simplest option. Add your email and password to `.env` and run:
 ```bash
 npm run auth      # Power Apps base session
 npm run auth:mda  # Dynamics 365 / MDA session
+```
+
+If you use friendly users in `qa.config.json`, you can authenticate a specific user by alias:
+
+```bash
+npm run auth:mda -- --user test-user-1
 ```
 
 A browser window opens, you sign in, approve MFA, and the session is saved. The script waits up to 2 minutes for MFA.
@@ -207,6 +239,8 @@ All methods save to the same location:
   state-mda-you@yourorg.com.json      ← Dynamics 365 / MDA session
 ```
 
+If you authenticate with `--user manager`, the session file is still keyed by that user's email so each real account gets its own saved state.
+
 ### Re-authenticating after 24 hours
 
 ```bash
@@ -239,6 +273,8 @@ npx playwright codegen \
 ```
 
 Replace `you@yourorg.com` with your `MS_AUTH_EMAIL` and `YOUR_MODEL_DRIVEN_APP_URL` with the value from your `.env` file.
+
+If you authenticated with a friendly alias, use that user's email-backed state file instead.
 
 Two windows open:
 - **Browser** — your MDA, already signed in
@@ -291,6 +327,7 @@ const ENTITY_NAME = 'your_entity_name';
 
 test.describe.serial('My Workflow', () => {
   test.setTimeout(180_000);
+  test.use({ userAlias: 'test-user-1' });
 
   test('create record', async ({ page, record }) => {
     await page.goto(MODEL_DRIVEN_APP_URL, { waitUntil: 'domcontentloaded' });
@@ -348,6 +385,8 @@ await page.getByRole('option', { name: record.status }).click();
 
 > **Tip — find exact field labels:** Run `npx playwright codegen --browser=chromium --load-storage=".playwright-ms-auth/state-mda-you@yourorg.com.json" "YOUR_MDA_URL"` and interact with the form. The recorder shows the exact selectors to use.
 
+> **Tip — pick a friendly user per test:** Add `test.use({ userAlias: 'manager' })` at the `describe` or test level when a workflow requires a different role.
+
 **Full test file structure**
 
 ```typescript
@@ -360,6 +399,7 @@ const ENTITY_NAME = 'cr123_myentity';
 
 test.describe.serial('My Entity: Create Record', () => {
   test.setTimeout(180_000); // MDA navigation is slow — 3 min per test is safe
+  test.use({ userAlias: 'test-user-1' });
 
   test('create a record', async ({ page, record }) => {
     // 1. Navigate to the entity grid

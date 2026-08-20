@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { DomainProfile } from '../factory';
+import { TEST_USERS, pickRandom } from '../static';
 
 const DEPARTMENTS  = ['Cardiology', 'Neurology', 'Orthopedics', 'Oncology', 'Radiology', 'Emergency', 'Pathology', 'Pediatrics'];
 const CONDITIONS   = ['Routine checkup', 'Post-operative follow-up', 'Chronic disease management', 'Diagnostic evaluation', 'Preventive care', 'Lab review'];
@@ -28,7 +29,7 @@ export const healthcareProfile: DomainProfile = {
     return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
   },
   status:      () => faker.helpers.arrayElement(STATUSES),
-  owner:       () => `Dr. ${faker.person.lastName()}, ${faker.helpers.arrayElement(['MD', 'DO', 'PhD'])}`,
+  owner:       () => pickRandom(TEST_USERS),
   notes:       () => {
     const element = faker.science.chemicalElement();
     const unit    = faker.science.unit();

@@ -1,0 +1,89 @@
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: playwright-secrets
+
+steps:
+  - task: NodeTool@0
+    displayName: 'Install Node.js'
+    inputs:
+      versionSpec: '20.x'
+
+  - script: npm ci
+    displayName: 'Install npm dependencies'
+
+  - script: npx playwright install --with-deps chromium
+    displayName: 'Install Playwright browsers'
+
+  # The current auth script launches a visible browser. xvfb provides a virtual
+  # display on the hosted Ubuntu agent so the script can still run in CI.
+  - script: xvfb-run -a npm run auth:mda
+    displayName: 'Authenticate MDA session'
+    env:
+      MODEL_DRIVEN_APP_URL: $(MODEL_DRIVEN_APP_URL)
+      MS_AUTH_EMAIL: $(MS_AUTH_EMAIL)
+
+  - script: npm test
+    displayName: 'Run Playwright tests'
+    env:
+      MODEL_DRIVEN_APP_URL: $(MODEL_DRIVEN_APP_URL)
+      MS_AUTH_EMAIL: $(MS_AUTH_EMAIL)
+      CI: 'true'
+      HEADLESS: 'true'
+    continueOnError: true
+
+  - task: PublishTestResults@2
+    displayName: 'Publish JUnit test results'
+    condition: always()
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: 'test-results/junit.xml'
+      mergeTestResults: true
+      failTaskOnFailedTests: true
+
+  - task: PublishPipelineArtifact@1
+    displayName: 'Upload Playwright HTML report'
+    condition: always()
+    inputs:
+      targetPath: 'playwright-report'
+      artifact: 'playwright-report'
+
+  - script: npm run report:a11y:check
+    displayName: 'Check for actionable accessibility violations'
+    name: a11yCheck
+    condition: always()
+
+  - task: ManualValidation@1
+    displayName: 'Review accessibility violations and approve bug creation'
+    condition: eq(variables['a11yViolationsFound'], 'true')
+    inputs:
+      notifyUsers: |
+        $(Build.RequestedForEmail)
+      instructions: |
+        Accessibility violations were found in this test run.
+
+        Before approving:
+          1. Download the 'playwright-report' artifact from this pipeline run
+          2. Open index.html in your browser
+          3. Click any test and inspect the 'Accessibility Report' attachment
+
+        If violations are in Microsoft-owned MDA components and cannot be fixed,
+        add their rule IDs to 'suppressedViolations' in qa.config.json instead of
+        creating bugs for them.
+
+        Approve to create one Azure DevOps Bug per unique violation rule.
+        Reject to skip bug creation for this run.
+      onTimeout: 'reject'
+      timeout: '1440'
+
+  - script: npm run report:a11y
+    displayName: 'Create Azure DevOps bugs for accessibility violations'
+    condition: eq(variables['a11yViolationsFound'], 'true')
+    env:
+      ADO_ORG_URL: $(ADO_ORG_URL)
+      ADO_PROJECT: $(ADO_PROJECT)
+      ADO_PAT: $(ADO_PAT)

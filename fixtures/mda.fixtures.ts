@@ -1,10 +1,19 @@
 import { test as base, expect } from '@playwright/test';
 import { createRecord, resolveProfile, MdaRecord } from '../data/factory';
 import { loadSeeded } from '../data/loader';
+import { qaConfig, resolveQaUser, QaUser } from '../data/qa-config';
+import { resolveStorageStatePath } from '../helpers/test-users';
 
 type MdaFixtures = {
   /** A fully-generated MDA record using the active domain profile. */
   record: MdaRecord;
+  /** The resolved QA user for the current test run. */
+  currentUser: QaUser;
+};
+
+type MdaOptions = {
+  /** Friendly QA user alias defined in qa.config.json. */
+  userAlias: string;
 };
 
 /**
@@ -25,9 +34,19 @@ type MdaFixtures = {
  *     await page.getByRole('textbox', { name: 'Unique ID' }).fill(record.uniqueId);
  *   });
  */
-export const test = base.extend<MdaFixtures>({
+export const test = base.extend<MdaFixtures & MdaOptions>({
+  userAlias: [qaConfig.users[0].alias, { option: true }],
+
+  storageState: async ({ userAlias }, use) => {
+    await use(resolveStorageStatePath('mda', userAlias));
+  },
+
+  currentUser: async ({ userAlias }, use) => {
+    await use(resolveQaUser(userAlias));
+  },
+
   record: async ({}, use, testInfo) => {
-    const domain  = process.env.FAKER_DOMAIN ?? 'generic';
+    const domain  = process.env.FAKER_DOMAIN ?? qaConfig.domain ?? 'generic';
     const seeded  = loadSeeded(domain);
     let data: MdaRecord;
 

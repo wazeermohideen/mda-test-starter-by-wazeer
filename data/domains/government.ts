@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { DomainProfile } from '../factory';
+import { TEST_USERS, pickRandom } from '../static';
 
 const AGENCIES     = ['EPA', 'USGS', 'FEMA', 'DOT', 'HHS', 'DOD', 'USACE', 'NPS', 'BLM', 'FDA'];
 const CASE_TYPES   = ['Compliance Review', 'Field Inspection', 'Permit Application', 'Incident Report', 'Environmental Assessment', 'Grant Request'];
@@ -34,7 +35,7 @@ export const governmentProfile: DomainProfile = {
     return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
   },
   status:      () => faker.helpers.arrayElement(STATUSES),
-  owner:       () => `${faker.helpers.arrayElement(AGENCIES)} — ${faker.person.fullName()}`,
+  owner:       () => pickRandom(TEST_USERS),
   notes:       () => `${faker.location.county()}, ${faker.location.state()} — ${faker.lorem.sentence()}`,
   // Government-specific extras
   agency:      () => faker.helpers.arrayElement(AGENCIES),
